@@ -125,3 +125,33 @@ export const techs = (state) => {
   const t = state.people.filter((p) => p.active !== false && (p.emp_type === 'field' || /ky thuat|lap dat/.test(fold(state.depts.find((d) => d.id === p.dept)?.name || ''))));
   return t.length ? t : sellers(state);
 };
+
+// ---------------------------------------------------------------------------
+// Cài đặt CRM (Quản trị sửa trong tab Cài đặt; lưu bảng crm_settings)
+export const DEFAULT_SETTINGS = {
+  sources: ['Fanpage', 'Zalo', 'Hotline', 'Showroom', 'TikTok', 'Website', 'Shopee / Lazada', 'Khách giới thiệu', 'Khách cũ', 'Khác'],
+  regions: ['Hà Nội', 'TP.HCM', 'Hải Phòng', 'Bắc Ninh', 'Đà Nẵng', 'Tỉnh khác'],
+  lost_reasons: ['Giá cao', 'Chọn hàng trên sàn / đối thủ', 'Chưa có nhu cầu ngay', 'Không phản hồi', 'Ngoài khu vực lắp đặt', 'Khác'],
+  categories: ['VOD chuyên nghiệp', 'Đầu liền màn VOD', 'TV Box', 'Âm thanh', 'Microphone', 'Phụ kiện', 'Khác'],
+  stale_days: 7, // khách đang theo không có chăm sóc quá N ngày → cảnh báo
+  quote_valid_days: 7,
+  follow_default_days: 1,
+  zalo_template: 'Chào anh/chị {ten}, em là {nhan_vien} bên VietK. Em gửi anh/chị thông tin bộ karaoke phù hợp nhu cầu {nhu_cau} ạ. Anh/chị cần em tư vấn thêm gì cứ nhắn em nhé!',
+  company_name: 'VietK — Công ty CP Điện tử Hồ Gươm',
+  company_address: 'D3K2 toà D chung cư Complex, ngõ 164 Khuất Duy Tiến, Thanh Xuân, Hà Nội',
+  company_phone: '1900.545568',
+  bank_info: '',
+  quote_note: 'Giá đã bao gồm VAT. Sản phẩm bảo hành chính hãng theo chính sách VietK.',
+  policy_notes: [],
+};
+export const withDefaults = (s) => ({ ...DEFAULT_SETTINGS, ...(s || {}) });
+// Nguồn khách: dữ liệu cũ lưu mã (fanpage…), dữ liệu mới lưu nhãn
+export const srcLabel = (s) => SOURCES[s] || s || '—';
+export const fillTemplate = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+export const staleCare = (state, c, days) => {
+  if (['won', 'lost'].includes(c.status)) return false;
+  const last = lastActivity(state, c.id)?.at || c.created_at;
+  return !!last && (Date.now() - new Date(last)) / 86400000 > days;
+};
+// Bậc khuyến mại ngắn gọn: "Mua 10 tặng 1 đôi · hoặc CK 8%"
+export const promoShort = (p) => [p.min_qty && `Mua ${p.min_qty}`, p.gift_qty && `tặng ${p.gift_qty}${p.gift ? ' ' + p.gift : ''}`, p.discount_pct != null && `${p.gift_qty ? 'hoặc ' : ''}CK ${p.discount_pct}%`].filter(Boolean).join(' ') || p.text;

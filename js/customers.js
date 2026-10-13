@@ -10,6 +10,7 @@ const FILTERS = [
   { id: 'follow', label: '📞 Cần gọi' },
   { id: 'open', label: 'Đang theo' },
   { id: 'unassigned', label: 'Chưa ai nhận' },
+  { id: 'stale', label: '⏳ Lâu chưa chăm sóc' },
   { id: 'won', label: 'Đã chốt' },
   { id: 'lost', label: 'Không mua' },
   { id: 'all', label: 'Tất cả' },
@@ -27,6 +28,7 @@ export function CustomersView({ ctx }) {
   const counts = {
     follow: mine.filter((c) => K.followState(c, today) === 'overdue' || K.followState(c, today) === 'today' || (c.status === 'new' && (!c.owner_id || c.owner_id === me.id))).length,
     unassigned: mine.filter((c) => !c.owner_id && c.status !== 'lost').length,
+    stale: mine.filter((c) => K.staleCare(state, c, state.settings.stale_days)).length,
   };
   const list = mine
     .filter((c) => {
@@ -34,6 +36,7 @@ export function CustomersView({ ctx }) {
       if (filter === 'follow') return ['overdue', 'today'].includes(K.followState(c, today)) || (c.status === 'new' && (!c.owner_id || c.owner_id === me.id));
       if (filter === 'open') return !['won', 'lost'].includes(c.status);
       if (filter === 'unassigned') return !c.owner_id && c.status !== 'lost';
+      if (filter === 'stale') return K.staleCare(state, c, state.settings.stale_days);
       if (filter === 'won' || filter === 'lost') return c.status === filter;
       return true;
     })
@@ -69,7 +72,7 @@ function CustomerRow({ c, ctx, onOpen }) {
   return html`<tr onClick=${onOpen}>
     <td><b>${c.name}</b>${c.kind === 'business' && html` <span class="tag">KD</span>`}<div class="muted small">${c.phone || ''}${c.area ? ' · ' + c.area : ''}</div></td>
     <td class="clamp small">${c.need || html`<span class="muted">—</span>`}</td>
-    <td class="small nowrap">${K.SOURCES[c.source] || c.source}</td>
+    <td class="small nowrap">${K.srcLabel(c.source)}</td>
     <td><${Badge} cls=${st.cls}>${st.icon} ${st.label}</${Badge}></td>
     <td class="small nowrap">${c.owner_id ? K.personName(ctx.state, c.owner_id) : html`<span class="warn-t">Chưa ai nhận</span>`}</td>
     <td class="nowrap">${c.next_follow ? html`<span class=${fs === 'overdue' ? 'bad-t' : fs === 'today' ? 'warn-t' : ''}>${fs === 'overdue' ? '⚠️ ' : ''}${U.fmtShort(c.next_follow)}</span>` : html`<span class="muted">—</span>`}</td>
@@ -79,7 +82,9 @@ function CustomerRow({ c, ctx, onOpen }) {
 // ---------------------------------------------------------------------------
 export function CustomerForm({ ctx, c, onClose, onSaved }) {
   const { state, me } = ctx;
-  const [f, setF] = useState(c || { name: '', phone: '', address: '', area: '', kind: 'home', source: 'fanpage', need: '', budget: '', status: 'new', owner_id: me.id, next_follow: U.todayStr(), note: '' });
+  const S = state.settings;
+  const [f, setF] = useState(c || { name: '', phone: '', address: '', area: '', kind: 'home', source: S.sources[0] || 'Khác', need: '', budget: '', status: 'new', owner_id: me.id, next_follow: U.addDays(+S.follow_default_days || 0), note: '' });
+  const sourceOpts = [...new Set([...S.sources, f.source].filter(Boolean))];
   const [dup, setDup] = useState([]);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -92,7 +97,7 @@ export function CustomerForm({ ctx, c, onClose, onSaved }) {
     e.preventDefault();
     if (!f.name.trim()) return setErr('Nhập tên khách');
     const row = actions.saveCustomer({ ...f, name: f.name.trim(), budget: f.budget === '' ? null : K.parseMoney(f.budget), owner_id: f.owner_id || null, next_follow: f.next_follow || null });
-    if (!c) actions.addActivity(row.id, 'note', `Tiếp nhận khách từ ${K.SOURCES[f.source] || f.source}${f.need ? ': ' + f.need : ''}`);
+    if (!c) actions.addActivity(row.id, 'note', `Tiếp nhận khách từ ${K.srcLabel(f.source)}${f.need ? ': ' + f.need : ''}`);
     ctx.notify(c ? 'Đã lưu' : 'Đã thêm khách');
     onSaved ? onSaved(row) : onClose();
   }
@@ -105,13 +110,13 @@ export function CustomerForm({ ctx, c, onClose, onSaved }) {
       </div>
       ${dup.length > 0 && html`<div class="alert warn">⚠️ Số này đã có trong CRM: ${dup.map((d) => html`<b>${d.customer_name}</b> (${d.owner_name ? 'phụ trách: ' + d.owner_name : 'chưa ai nhận'}, ${K.CUSTOMER_STATUS[d.status]?.label}) `)} — kiểm tra trước khi thêm trùng.</div>`}
       <div class="grid2">
-        <label>Nguồn<select value=${f.source} onChange=${set('source')}>${Object.entries(K.SOURCES).map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select></label>
+        <label>Nguồn<select value=${f.source} onChange=${set('source')}>${sourceOpts.map((s) => html`<option value=${s}>${K.srcLabel(s)}</option>`)}</select></label>
         <label>Loại<select value=${f.kind} onChange=${set('kind')}>${Object.entries(K.KINDS).map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select></label>
       </div>
       <label>Nhu cầu<textarea rows="2" value=${f.need || ''} onInput=${set('need')} placeholder="Phòng 25m², hát gia đình, thích loa màu trắng…"></textarea></label>
       <div class="grid2">
         <label>Ngân sách<input value=${f.budget ?? ''} onInput=${set('budget')} placeholder="vd 25tr" /></label>
-        <label>Khu vực<input value=${f.area || ''} onInput=${set('area')} placeholder="Cầu Giấy, Hà Nội" /></label>
+        <label>Khu vực<input list="vk-regions" value=${f.area || ''} onInput=${set('area')} placeholder="Cầu Giấy, Hà Nội" /><datalist id="vk-regions">${S.regions.map((r) => html`<option value=${r} />`)}</datalist></label>
       </div>
       <label>Địa chỉ<input value=${f.address || ''} onInput=${set('address')} /></label>
       <div class="grid2">
@@ -121,7 +126,7 @@ export function CustomerForm({ ctx, c, onClose, onSaved }) {
         <label>Hẹn gọi lại<input type="date" value=${f.next_follow || ''} onInput=${set('next_follow')} /></label>
       </div>
       ${c && html`<label>Trạng thái<select value=${f.status} onChange=${set('status')}>${Object.entries(K.CUSTOMER_STATUS).map(([k, s]) => html`<option value=${k}>${s.icon} ${s.label}</option>`)}</select></label>
-        ${f.status === 'lost' && html`<label>Lý do không mua<input value=${f.lost_reason || ''} onInput=${set('lost_reason')} placeholder="Giá cao, chọn hàng sàn…" /></label>`}`}
+        ${f.status === 'lost' && html`<label>Lý do không mua<select value=${f.lost_reason || ''} onChange=${set('lost_reason')}><option value="">— Chọn lý do —</option>${[...new Set([...S.lost_reasons, f.lost_reason].filter(Boolean))].map((r) => html`<option>${r}</option>`)}</select></label>`}`}
       <label>Ghi chú<textarea rows="2" value=${f.note || ''} onInput=${set('note')}></textarea></label>
       ${err && html`<div class="err">${err}</div>`}
       <div class="row end"><button type="button" class="btn" onClick=${onClose}>Huỷ</button><button class="btn primary">Lưu</button></div>
@@ -143,8 +148,8 @@ export function CustomerDrawer({ ctx, c, onClose, tab0 = 'care' }) {
       <div class="drawer-head">
         <div>
           <h2>${c.name} <${Badge} cls=${st.cls}>${st.icon} ${st.label}</${Badge}></h2>
-          <div class="muted small">${K.KINDS[c.kind]} · ${K.SOURCES[c.source] || c.source} · Phụ trách: ${c.owner_id ? K.personName(state, c.owner_id) : 'chưa ai nhận'}</div>
-          ${c.phone && html`<div class="row gap"><a class="btn sm" href=${K.telHref(c.phone)}>📞 ${c.phone}</a><a class="btn sm" href=${K.zaloHref(c.phone)} target="_blank" rel="noopener">💬 Zalo</a></div>`}
+          <div class="muted small">${K.KINDS[c.kind]} · ${K.srcLabel(c.source)} · Phụ trách: ${c.owner_id ? K.personName(state, c.owner_id) : 'chưa ai nhận'}</div>
+          ${c.phone && html`<div class="row gap"><a class="btn sm" href=${K.telHref(c.phone)}>📞 ${c.phone}</a><a class="btn sm" href=${K.zaloHref(c.phone)} target="_blank" rel="noopener" onClick=${() => copyZalo(ctx, c)} title="Mở Zalo + copy sẵn tin nhắn mẫu">💬 Zalo</a></div>`}
         </div>
         <button class="x" onClick=${onClose}>×</button>
       </div>
@@ -234,4 +239,13 @@ function Care({ ctx, c }) {
       </div>`) : html`<div class="muted small">Chưa có lịch sử chăm sóc.</div>`}
     </div>
   </div>`;
+}
+
+// Copy tin nhắn mẫu (Cài đặt → Mẫu tin nhắn Zalo) để dán ngay khi Zalo mở
+function copyZalo(ctx, c) {
+  const S = ctx.state.settings;
+  const text = K.fillTemplate(S.zalo_template, { ten: c.name, nhu_cau: c.need || 'karaoke', nhan_vien: ctx.me.full_name, hotline: S.company_phone });
+  try {
+    navigator.clipboard.writeText(text).then(() => ctx.notify('Đã copy tin nhắn mẫu — dán vào Zalo'), () => {});
+  } catch {}
 }

@@ -24,7 +24,7 @@ export function DashboardView({ ctx, go }) {
   const unassigned = customers.filter((c) => !c.owner_id && c.status !== 'lost').length;
   const wonCustomers = new Set(won.map((o) => o.customer_id));
   const rate = newC.length ? Math.round((newC.filter((c) => c.status === 'won' || wonCustomers.has(c.id)).length / newC.length) * 100) : null;
-  const bySource = Object.keys(K.SOURCES).map((s) => {
+  const bySource = [...new Set(newC.map((c) => c.source))].map((s) => {
     const cs = newC.filter((c) => c.source === s);
     return { s, n: cs.length, won: cs.filter((c) => c.status === 'won').length, rev: won.filter((o) => cs.some((c) => c.id === o.customer_id)).reduce((x, o) => x + +o.total, 0) };
   }).filter((x) => x.n).sort((x, y) => y.n - x.n);
@@ -61,7 +61,7 @@ export function DashboardView({ ctx, go }) {
     <div class="grid-2col">
       <section class="section"><div class="section-head"><h2>Nguồn khách</h2></div>
         ${bySource.length ? html`<div class="card pad stack">${bySource.map((x) => html`<div>
-          <div class="row between small"><b>${K.SOURCES[x.s]}</b><span>${x.n} khách · chốt ${x.won} · ${K.moneyShort(x.rev)}</span></div>
+          <div class="row between small"><b>${K.srcLabel(x.s)}</b><span>${x.n} khách · chốt ${x.won} · ${K.moneyShort(x.rev)}</span></div>
           <${Bar} pct=${(x.n / maxSrc) * 100} cls="brand" /></div>`)}</div>` : html`<${Empty}>Chưa có khách mới trong kỳ.</${Empty}>`}
       </section>
       <section class="section"><div class="section-head"><h2>Phễu khách đang theo</h2></div>

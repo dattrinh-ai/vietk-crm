@@ -74,7 +74,7 @@ export function NewOrderButton({ ctx, customer, onCreated }) {
   const [pick, setPick] = useState(false);
   const [q, setQ] = useState('');
   async function create(c) {
-    const o = await actions.saveOrder({ customer_id: c.id, status: 'quote', delivery: 'install', address: c.address || '', discount: 0, quote_valid_until: U.addDays(7) }, []);
+    const o = await actions.saveOrder({ customer_id: c.id, status: 'quote', delivery: 'install', address: c.address || '', discount: 0, quote_valid_until: U.addDays(+ctx.state.settings.quote_valid_days || 7) }, []);
     if (c.status === 'new' || c.status === 'consulting') actions.saveCustomer({ ...c, status: 'quoted' });
     setPick(false);
     onCreated && onCreated(o);
@@ -266,12 +266,13 @@ function OrderMore({ ctx, o, onDeleted }) {
 
 // Bản in báo giá / phiếu đơn hàng (dùng Ctrl+P → Lưu PDF để gửi Zalo)
 function PrintQuote({ ctx, o, c, items, paid, onClose }) {
+  const S = ctx.state.settings;
   const quote = o.status === 'quote';
   const sub = K.subtotal(items);
   return html`<div class="print-wrap">
     <div class="print-bar no-print"><button class="btn primary" onClick=${() => print()}>🖨 In / Lưu PDF</button><button class="btn" onClick=${onClose}>Đóng</button></div>
     <div class="paper">
-      <div class="row between"><img src="assets/logo-full.png" alt="VietK" style="width:190px" />
+      <div class="row between"><div><img src="assets/logo-full.png" alt="VietK" style="width:190px" /><div class="small">${S.company_name}<br />${S.company_address}<br />Hotline: ${S.company_phone}</div></div>
         <div class="right small"><b style="font-size:20px">${quote ? 'BÁO GIÁ' : 'PHIẾU ĐƠN HÀNG'}</b><div>Số: ${o.code}</div><div>Ngày: ${U.fmtDate((o.created_at || U.todayStr()).slice(0, 10))}</div></div></div>
       <hr />
       <p><b>Kính gửi:</b> ${c?.name}${c?.phone ? ' · ' + c.phone : ''}<br /><b>Địa chỉ:</b> ${o.address || c?.address || '—'}</p>
@@ -283,7 +284,7 @@ function PrintQuote({ ctx, o, c, items, paid, onClose }) {
           <tr><td colspan="4" class="right"><b>Tổng cộng</b></td><td class="right"><b>${K.money(o.total)}</b></td></tr>
           ${!quote && html`<tr><td colspan="4" class="right">Đã thanh toán</td><td class="right">${K.money(paid)}</td></tr><tr><td colspan="4" class="right"><b>Còn lại</b></td><td class="right"><b>${K.money(Math.max(0, o.total - paid))}</b></td></tr>`}
         </tfoot></table>
-      <p class="small">${K.DELIVERY[o.delivery]}${quote && o.quote_valid_until ? ` · Báo giá có hiệu lực đến ${U.fmtDate(o.quote_valid_until)}` : ''}. Sản phẩm bảo hành chính hãng theo chính sách VietK.${o.note ? html`<br />${o.note}` : ''}</p>
+      <p class="small">${K.DELIVERY[o.delivery]}${quote && o.quote_valid_until ? ` · Báo giá có hiệu lực đến ${U.fmtDate(o.quote_valid_until)}` : ''}. ${S.quote_note ? ' ' + S.quote_note : ''}${o.note ? html`<br />${o.note}` : ''}${S.bank_info ? html`<br /><b>Thanh toán:</b> <span class="pre">${S.bank_info}</span>` : ''}</p>
       <div class="row between small sign"><div>Khách hàng<br /><br /><br /></div><div>Người lập: ${K.personName(ctx.state, o.owner_id)}<br /><br /><br /></div></div>
     </div>
   </div>`;

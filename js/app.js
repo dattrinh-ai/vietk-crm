@@ -6,6 +6,7 @@ import { CustomersView } from './customers.js';
 import { OrdersView } from './orders.js';
 import { InstallsView } from './installs.js';
 import { ProductsView } from './products.js';
+import { SettingsView } from './settings.js';
 import * as U from './util.js';
 import * as K from './core.js';
 import { CONFIG } from './config.js';
@@ -18,10 +19,12 @@ const ITEMS = {
   orders: { id: 'orders', label: 'Đơn hàng', icon: '🧾' },
   installs: { id: 'installs', label: 'Lắp đặt', icon: '🛠', badge: installBadge },
   products: { id: 'products', label: 'Sản phẩm', icon: '📦' },
+  settings: { id: 'settings', label: 'Cài đặt', icon: '⚙️' },
 };
 // Menu theo vai trò; kỹ thuật viên mở thẳng lịch lắp đặt
 function navFor(me) {
-  if (me.role === 'admin' || me.role === 'manager') return ['dashboard', 'customers', 'orders', 'installs', 'products'].map((k) => ITEMS[k]);
+  if (me.role === 'admin') return ['dashboard', 'customers', 'orders', 'installs', 'products', 'settings'].map((k) => ITEMS[k]);
+  if (me.role === 'manager') return ['dashboard', 'customers', 'orders', 'installs', 'products'].map((k) => ITEMS[k]);
   if (me.emp_type === 'field') return ['installs', 'customers', 'orders', 'products'].map((k) => ITEMS[k]);
   return ['customers', 'orders', 'installs', 'products'].map((k) => ITEMS[k]);
 }
@@ -111,6 +114,7 @@ function App({ meId, onSignOut }) {
       ${cur === 'orders' && html`<${OrdersView} ctx=${ctx} key=${me.id} />`}
       ${cur === 'installs' && html`<${InstallsView} ctx=${ctx} key=${me.id} />`}
       ${cur === 'products' && html`<${ProductsView} ctx=${ctx} key=${me.id} />`}
+      ${cur === 'settings' && html`<${SettingsView} ctx=${ctx} key=${me.id} />`}
     </main>
     ${toast && html`<div class=${'toast ' + toast.type} key=${toast.k}>${toast.msg}</div>`}
   `;

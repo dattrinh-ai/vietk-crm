@@ -5,7 +5,7 @@
 import { makeSeed } from './seed.js';
 import { CONFIG } from './config.js';
 import { uid, todayStr, setDepts } from './util.js';
-import { normPhone } from './core.js';
+import { normPhone, withDefaults } from './core.js';
 
 export const LIVE = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const KEY = 'vietk-crm-demo-v1';
@@ -33,6 +33,7 @@ export function setErrorHandler(f) {
 }
 export function resetDemo() {
   state = makeSeed();
+  state.settings = withDefaults(state.settings);
   setDepts(state.depts);
   commit();
 }
@@ -64,7 +65,7 @@ const COLS = {
   items: ['id', 'order_id', 'product_id', 'combo_id', 'name', 'qty', 'price', 'sort'],
   payments: ['id', 'order_id', 'amount', 'method', 'paid_at', 'note'],
   installs: ['id', 'order_id', 'date', 'time', 'tech_ids', 'status', 'checklist', 'note', 'issue'],
-  products: ['id', 'sku', 'name', 'category', 'brand', 'unit', 'price', 'dealer_price', 'warranty_months', 'track_serial', 'active', 'note'],
+  products: ['id', 'sku', 'name', 'full_name', 'category', 'brand', 'unit', 'price', 'dealer_price', 'min_dealer_price', 'demo_price', 'flex_price', 'promos', 'warranty_months', 'track_serial', 'active', 'note', 'sort'],
   combos: ['id', 'name', 'price', 'items', 'active', 'note'],
 };
 const TABLE = { customers: 'crm_customers', orders: 'crm_orders', items: 'crm_order_items', payments: 'crm_payments', installs: 'crm_installs', products: 'crm_products', combos: 'crm_combos', activities: 'crm_activities' };
@@ -99,6 +100,7 @@ export async function initStore() {
       if (raw) state = JSON.parse(raw);
     } catch {}
     state = state || makeSeed();
+    state.settings = withDefaults(state.settings);
     setDepts(state.depts);
     commit();
     return;
@@ -111,12 +113,13 @@ export async function loadLive() {
   const s = await auth.session();
   if (!s) return null;
   const meId = s.user.id;
-  const members = chk(await sb.from('cl_members').select('id, email, full_name, role, dept, title, active, emp_type, crm_access').order('created_at'));
+  const members = chk(await sb.from('cl_members').select('id, email, full_name, role, dept, title, active, emp_type, crm_access, created_at').order('created_at'));
   const me = members.find((m) => m.id === meId);
   if (!me || !me.active || !me.crm_access || me.role === 'bod') return { notMember: true, email: s.user.email };
-  const [depts, products, costs, combos, customers, activities, orders, items, payments, installs] = await Promise.all([
+  const [settings, depts, products, costs, combos, customers, activities, orders, items, payments, installs] = await Promise.all([
+    sb.from('crm_settings').select('data').eq('id', 1).maybeSingle().then(chk).catch(() => null),
     all(() => sb.from('cl_depts').select('*').order('sort')),
-    all(() => sb.from('crm_products').select('*').order('category').order('name')),
+    all(() => sb.from('crm_products').select('*').order('sort').order('name')),
     me.role === 'admin' ? all(() => sb.from('crm_product_costs').select('*')) : Promise.resolve([]),
     all(() => sb.from('crm_combos').select('*').order('name')),
     all(() => sb.from('crm_customers').select('*').order('created_at', { ascending: false })),
@@ -130,6 +133,7 @@ export async function loadLive() {
   state = {
     live: true,
     meId,
+    settings: withDefaults(settings?.data),
     people: members,
     depts,
     products,
@@ -307,5 +311,82 @@ export const actions = {
   },
   async reload() {
     return LIVE ? loadLive() : state;
+  },
+
+  // ----- Cài đặt (Quản trị) -----
+  saveSettings(patch) {
+    state.settings = { ...state.settings, ...patch };
+    commit();
+    return persist(() => run(sb.from('crm_settings').update({ data: state.settings, updated_at: now() }).eq('id', 1)));
+  },
+  updateMember(id, patch) {
+    state.people = state.people.map((p) => (p.id === id ? { ...p, ...patch } : p));
+    commit();
+    return persist(() => run(sb.from('cl_members').update(patch).eq('id', id)));
+  },
+  async createMember(p) {
+    if (!LIVE) {
+      const row = { id: uid(), active: true, crm_access: true, ...p };
+      delete row.password;
+      state.people = [...state.people, row];
+      commit();
+      return row;
+    }
+    const { data, error } = await sb.functions.invoke('cl-admin-users', { body: { action: 'create', ...p } });
+    if (error) {
+      let msg = error.message;
+      try {
+        msg = (await error.context.json()).error || msg;
+      } catch {}
+      throw new Error(translate(msg));
+    }
+    await loadLive();
+    return data;
+  },
+  async resetPassword(userId, password) {
+    if (!LIVE) return { ok: true };
+    const { error } = await sb.functions.invoke('cl-admin-users', { body: { action: 'reset_password', user_id: userId, password } });
+    if (error) {
+      let msg = error.message;
+      try {
+        msg = (await error.context.json()).error || msg;
+      } catch {}
+      throw new Error(translate(msg));
+    }
+    return { ok: true };
+  },
+  // Nhập bảng giá: khớp theo mã (SKU) hoặc tên → sửa sản phẩm có sẵn, thêm sản phẩm mới. Không xoá gì.
+  async importProducts(rows, { onProgress } = {}) {
+    const bySku = Object.fromEntries(state.products.filter((p) => p.sku).map((p) => [p.sku.toUpperCase(), p]));
+    const byName = Object.fromEntries(state.products.map((p) => [p.name.toLowerCase(), p]));
+    let added = 0, updated = 0;
+    for (const [i, r] of rows.entries()) {
+      onProgress && onProgress(i + 1, rows.length);
+      const { cost, ...fields } = r;
+      const old = bySku[String(r.sku || '').toUpperCase()] || byName[r.name.toLowerCase()];
+      const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== undefined));
+      const row = { track_serial: true, warranty_months: 12, brand: /bbs/i.test(r.name) ? 'BBS' : 'VietK', active: true, ...(old || {}), ...clean, id: old?.id || uid(), sort: i };
+      const { saved } = upsert('products', row);
+      old ? updated++ : added++;
+      if (cost != null) {
+        state.costs = { ...state.costs, [row.id]: cost };
+        commit();
+      }
+      await persist(async () => {
+        await saved;
+        if (cost != null) await run(sb.from('crm_product_costs').upsert({ product_id: row.id, cost, updated_at: now() }));
+      });
+    }
+    return { added, updated };
+  },
+  async importCustomers(rows, { onProgress } = {}) {
+    let n = 0;
+    for (const [i, r] of rows.entries()) {
+      onProgress && onProgress(i + 1, rows.length);
+      const { saved } = upsert('customers', { ...r, id: uid(), created_by: state.meId, updated_at: now() });
+      await persist(() => saved);
+      n++;
+    }
+    return n;
   },
 };
