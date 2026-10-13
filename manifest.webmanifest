@@ -4,7 +4,7 @@
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f5f7fb",
-  "theme_color": "#ce1126",
+  "theme_color": "#333e50",
   "lang": "vi",
   "icons": [{ "src": "assets/logo-mark.png", "sizes": "256x256", "type": "image/png", "purpose": "any" }]
 }

@@ -8,7 +8,7 @@
 .chip b { background: var(--brand); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 2px; }
 .chip.on b { background: #fff; color: var(--brand); }
 .table.clickable tbody tr { cursor: pointer; }
-.table.clickable tbody tr:hover { background: #fdf2f3; }
+.table.clickable tbody tr:hover { background: #f1f8ec; }
 .alert.bad { background: var(--bad-bg); color: var(--bad); }
 .alert.row { display: flex; }
 .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -17,7 +17,7 @@
 /* Chọn nhanh khách / sản phẩm */
 .pick-list { display: grid; gap: 4px; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; background: #fff; }
 .pick { text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; }
-.pick:hover { background: #fdf2f3; }
+.pick:hover { background: #f1f8ec; }
 .addline { display: grid; gap: 6px; }
 
 /* Dòng hàng trong báo giá */

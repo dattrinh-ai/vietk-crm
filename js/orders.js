@@ -271,7 +271,7 @@ function PrintQuote({ ctx, o, c, items, paid, onClose }) {
   return html`<div class="print-wrap">
     <div class="print-bar no-print"><button class="btn primary" onClick=${() => print()}>🖨 In / Lưu PDF</button><button class="btn" onClick=${onClose}>Đóng</button></div>
     <div class="paper">
-      <div class="row between"><div class="row"><img src="assets/logo-mark.png" alt="" style="width:48px" /><div><b style="font-size:18px">VietK</b><div class="small">Giải pháp karaoke hàng đầu Việt Nam</div></div></div>
+      <div class="row between"><img src="assets/logo-full.png" alt="VietK" style="width:190px" />
         <div class="right small"><b style="font-size:20px">${quote ? 'BÁO GIÁ' : 'PHIẾU ĐƠN HÀNG'}</b><div>Số: ${o.code}</div><div>Ngày: ${U.fmtDate((o.created_at || U.todayStr()).slice(0, 10))}</div></div></div>
       <hr />
       <p><b>Kính gửi:</b> ${c?.name}${c?.phone ? ' · ' + c.phone : ''}<br /><b>Địa chỉ:</b> ${o.address || c?.address || '—'}</p>
