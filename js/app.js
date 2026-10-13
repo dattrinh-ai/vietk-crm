@@ -8,6 +8,7 @@ import { InstallsView } from './installs.js';
 import { ProductsView } from './products.js';
 import * as U from './util.js';
 import * as K from './core.js';
+import { CONFIG } from './config.js';
 
 const followBadge = (s, me) => K.visibleCustomers(s, me).filter((c) => ['overdue', 'today'].includes(K.followState(c)) || (c.status === 'new' && !c.owner_id)).length;
 const installBadge = (s, me) => s.installs.filter((i) => i.date === U.todayStr() && i.status === 'scheduled' && (me.role !== 'staff' || i.tech_ids.includes(me.id))).length;
@@ -89,6 +90,7 @@ function App({ meId, onSignOut }) {
     </div>`}
     <header class="topbar">
       <div class="brand"><img class="wm" src="assets/logo-wordmark.png" alt="VietK" /><span class="tagapp">CRM</span></div>
+      <a class="btn appswitch" href=${CONFIG.CHECKLIST_URL}>☑️ Checklist</a>
       <nav class="tabs">
         ${nav.map((n) => html`<a href=${'#' + n.id} class=${cur === n.id ? 'on' : ''} onClick=${(e) => { e.preventDefault(); go(n.id); }}>
           <span class="ic">${n.icon}</span><span>${n.label}</span>${n.badge && n.badge(state, me) > 0 && html`<i class="nbadge">${n.badge(state, me)}</i>`}</a>`)}

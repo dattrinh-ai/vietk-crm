@@ -414,6 +414,7 @@ td.num.ok { color: var(--ok); font-weight: 600; } td.num.warn { color: var(--war
 .center-brand { justify-content: center; }
 .btn.block { width: 100%; padding: 10px; }
 .usermenu { position: relative; }
+.appswitch { flex: none; text-decoration: none; white-space: nowrap; font-weight: 600; padding: 5px 10px; font-size: 13px; }
 button.me { background: none; border: 0; cursor: pointer; padding: 0; text-align: left; }
 .menu { position: absolute; right: 0; top: 44px; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, .15); min-width: 220px; overflow: hidden; z-index: 30; }
 .menu-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; }

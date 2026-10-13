@@ -6,5 +6,8 @@ export const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_JMXx87gAD-iBxDDlUK664A_TR3dkuQS',
   VAPID_PUBLIC_KEY: 'BOUMK0K5YgrEjq-qPBBQ6jPA1GnsNgqUDadDQheDLAGl6JqVWhASODrqpUx8206JXoa8xlojtm6lYJ0ChYKrZvQ',
   // Tên bot Telegram của VietK (không có @) — điền khi VietK tạo bot
+  // Địa chỉ 2 app (nút chuyển qua lại trên thanh trên cùng)
+  CHECKLIST_URL: 'https://dattrinh-ai.github.io/vietk-checklist/',
+  CRM_URL: 'https://dattrinh-ai.github.io/vietk-crm/',
   TELEGRAM_BOT: '',
 };
