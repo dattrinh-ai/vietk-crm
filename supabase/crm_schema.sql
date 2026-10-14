@@ -277,6 +277,10 @@ language sql stable security definer set search_path = public as $$
     or exists (select 1 from public.crm_orders o join public.crm_installs i on i.order_id = o.id
                where o.customer_id = p_id and auth.uid() = any (i.tech_ids)))
 $$;
+create or replace function public.crm_can_see_order_row(p_customer uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.crm_customers c where c.id = p_customer and public.crm_can_see_customer(c.owner_id, c.id))
+$$;
 create or replace function public.crm_can_see_order(p_order uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.crm_orders o join public.crm_customers c on c.id = o.customer_id
@@ -330,11 +334,11 @@ create policy crm_activities_insert on public.crm_activities for insert to authe
 create policy crm_activities_delete on public.crm_activities for delete to authenticated using (by_id = auth.uid() or public.cl_is_admin());
 
 -- Đơn hàng & phần con: theo quyền xem khách
-create policy crm_orders_select on public.crm_orders for select to authenticated using (public.crm_can_see_order(id));
+create policy crm_orders_select on public.crm_orders for select to authenticated using (public.crm_can_see_order_row(customer_id));
 create policy crm_orders_insert on public.crm_orders for insert to authenticated
   with check (exists (select 1 from public.crm_customers c where c.id = customer_id));
-create policy crm_orders_update on public.crm_orders for update to authenticated using (public.crm_can_see_order(id))
-  with check (exists (select 1 from public.crm_customers c where c.id = customer_id));
+create policy crm_orders_update on public.crm_orders for update to authenticated
+  using (public.crm_can_see_order_row(customer_id)) with check (public.crm_can_see_order_row(customer_id));
 create policy crm_orders_delete on public.crm_orders for delete to authenticated using (public.cl_is_admin() or (status = 'quote' and owner_id = auth.uid()));
 do $$
 declare t text;
