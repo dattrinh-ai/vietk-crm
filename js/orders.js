@@ -144,7 +144,10 @@ export function OrderDrawer({ ctx, o, onClose }) {
 function ItemsEditor({ ctx, o, items }) {
   const { state } = ctx;
   const [rows, setRows] = useState(items.map((i) => ({ ...i })));
-  const [discount, setDiscount] = useState(o.discount || 0);
+  // Giảm giá: theo số tiền hoặc theo % (lưu cả % để mở lại vẫn đúng kiểu giảm)
+  const [mode, setMode] = useState(o.discount_pct != null ? 'pct' : 'amount');
+  const [discount, setDiscount] = useState(o.discount_pct != null ? '' : o.discount || '');
+  const [pct, setPct] = useState(o.discount_pct ?? '');
   const [q, setQ] = useState('');
   const [dirty, setDirty] = useState(false);
   const locked = ['done', 'cancelled'].includes(o.status);
@@ -163,11 +166,22 @@ function ItemsEditor({ ctx, o, items }) {
     ? [...combos.filter((c) => K.matches(q, c.name)).map((c) => ({ combo: c })), ...products.filter((p) => K.matches(q, p.name, p.sku, p.category)).map((p) => ({ product: p }))].slice(0, 10)
     : [];
   async function save() {
-    await actions.saveOrder({ ...o, discount: K.parseMoney(discount) }, rows.map(({ id, product_id, combo_id, name, qty, price }) => ({ id, product_id: product_id || null, combo_id: combo_id || null, name, qty: +qty || 1, price: K.parseMoney(price) })));
+    if (mode === 'pct' && (+pct < 0 || +pct > 100)) return ctx.notify('% giảm phải từ 0 đến 100', 'err');
+    await actions.saveOrder({ ...o, discount: discAmt, discount_pct: mode === 'pct' && pct !== '' ? +String(pct).replace(',', '.') : null }, rows.map(({ id, product_id, combo_id, name, qty, price }) => ({ id, product_id: product_id || null, combo_id: combo_id || null, name, qty: +qty || 1, price: K.parseMoney(price) })));
     setDirty(false);
     ctx.notify('Đã lưu hàng & giá');
   }
-  const total = K.orderTotal(rows.map((r) => ({ qty: r.qty, price: K.parseMoney(r.price) })), K.parseMoney(discount));
+  const sub = K.subtotal(rows.map((r) => ({ qty: r.qty, price: K.parseMoney(r.price) })));
+  const discAmt = mode === 'pct' ? K.pctDiscount(sub, pct) : K.parseMoney(discount);
+  const total = Math.max(0, sub - discAmt);
+  const switchMode = (m) => {
+    if (m === mode) return;
+    // giữ nguyên số tiền giảm khi đổi kiểu (quy đổi qua lại)
+    if (m === 'pct') setPct(sub && discAmt ? Math.round((discAmt / sub) * 10000) / 100 : '');
+    else setDiscount(discAmt || '');
+    setMode(m);
+    setDirty(true);
+  };
   return html`<div class="stack">
     ${!locked && html`<div class="addline">
       <input type="search" placeholder="🔎 Thêm combo / sản phẩm: gõ BBS8, iCON-9, micro…" value=${q} onInput=${(e) => setQ(e.target.value)} />
@@ -188,8 +202,15 @@ function ItemsEditor({ ctx, o, items }) {
       </tr>`)}</tbody>
     </table></div>` : html`<${Empty}>Chưa có hàng — tìm combo hoặc sản phẩm ở ô phía trên.</${Empty}>`}
     <div class="totals">
-      <div class="row between"><span>Tạm tính</span><b>${K.money(K.subtotal(rows.map((r) => ({ qty: r.qty, price: K.parseMoney(r.price) }))))}</b></div>
-      <div class="row between"><span>Giảm giá</span>${locked ? K.money(discount) : html`<input class="cell num" style="max-width:10rem" value=${discount} onInput=${(e) => { setDiscount(e.target.value); setDirty(true); }} />`}</div>
+      <div class="row between"><span>Tạm tính</span><b>${K.money(sub)}</b></div>
+      ${locked ? html`<div class="row between"><span>Giảm giá${mode === 'pct' ? ` (${pct}%)` : ''}</span><span>− ${K.money(discAmt)}</span></div>`
+        : html`<div class="row between disc">
+          <span class="row">Giảm giá
+            <span class="seg sm"><button type="button" class=${mode === 'amount' ? 'on' : ''} onClick=${() => switchMode('amount')}>Số tiền</button><button type="button" class=${mode === 'pct' ? 'on' : ''} onClick=${() => switchMode('pct')}>Theo %</button></span></span>
+          ${mode === 'pct'
+            ? html`<span class="row"><span class="pct-in"><input class="cell num" inputmode="decimal" value=${pct} placeholder="0" onInput=${(e) => { setPct(e.target.value.replace(/[^\d.,]/g, '')); setDirty(true); }} /><b>%</b></span><span class="muted nowrap">= − ${K.money(discAmt)}</span></span>`
+            : html`<input class="cell num" style="max-width:10rem" value=${discount} placeholder="vd 500k, 1tr" onInput=${(e) => { setDiscount(e.target.value); setDirty(true); }} />`}
+        </div>`}
       <div class="row between big"><span>Tổng cộng</span><b>${K.money(total)}</b></div>
     </div>
     ${!locked && html`<div class="row end"><button class="btn primary" disabled=${!dirty} onClick=${save}>${dirty ? 'Lưu hàng & giá' : 'Đã lưu'}</button></div>`}
@@ -280,7 +301,7 @@ function PrintQuote({ ctx, o, c, items, paid, onClose }) {
         <tbody>${items.map((i, k) => html`<tr><td>${k + 1}</td><td>${i.name}${i.combo_id && html`<div class="small">${(ctx.state.combos.find((x) => x.id === i.combo_id)?.items || []).map((x) => `${ctx.state.products.find((p) => p.id === x.product_id)?.name || ''} x${x.qty}`).join(' + ')}</div>`}</td>
           <td>${i.qty}</td><td class="right">${K.money(i.price)}</td><td class="right">${K.money(i.qty * i.price)}</td></tr>`)}</tbody>
         <tfoot>
-          ${+o.discount > 0 && html`<tr><td colspan="4" class="right">Tạm tính</td><td class="right">${K.money(sub)}</td></tr><tr><td colspan="4" class="right">Giảm giá</td><td class="right">− ${K.money(o.discount)}</td></tr>`}
+          ${+o.discount > 0 && html`<tr><td colspan="4" class="right">Tạm tính</td><td class="right">${K.money(sub)}</td></tr><tr><td colspan="4" class="right">Giảm giá${o.discount_pct != null ? ` (${o.discount_pct}%)` : ''}</td><td class="right">− ${K.money(o.discount)}</td></tr>`}
           <tr><td colspan="4" class="right"><b>Tổng cộng</b></td><td class="right"><b>${K.money(o.total)}</b></td></tr>
           ${!quote && html`<tr><td colspan="4" class="right">Đã thanh toán</td><td class="right">${K.money(paid)}</td></tr><tr><td colspan="4" class="right"><b>Còn lại</b></td><td class="right"><b>${K.money(Math.max(0, o.total - paid))}</b></td></tr>`}
         </tfoot></table>

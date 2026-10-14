@@ -76,3 +76,10 @@
 .card.policy { margin-bottom: 12px; border-left: 4px solid var(--brand); }
 .card.policy ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
 .pname { min-width: 240px; }
+/* Giảm giá theo % / số tiền */
+.seg.sm button { padding: 3px 9px; font-size: 12.5px; }
+.totals .disc { flex-wrap: wrap; gap: 6px; }
+.pct-in { display: inline-flex; align-items: center; gap: 4px; }
+.pct-in input { width: 5rem; min-width: 0; }
+.table.lines td:first-child { min-width: 180px; }
+.table.lines .cell.num:not(.w-num) { min-width: 0; width: 7.5rem; }

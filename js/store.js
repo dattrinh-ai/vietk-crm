@@ -61,7 +61,7 @@ async function all(q) {
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k] === '' ? null : o[k]]));
 const COLS = {
   customers: ['id', 'name', 'phone', 'phone2', 'address', 'area', 'kind', 'source', 'need', 'budget', 'status', 'owner_id', 'next_follow', 'lost_reason', 'note'],
-  orders: ['id', 'customer_id', 'owner_id', 'status', 'delivery', 'address', 'discount', 'total', 'quote_valid_until', 'note'],
+  orders: ['id', 'customer_id', 'owner_id', 'status', 'delivery', 'address', 'discount', 'discount_pct', 'total', 'quote_valid_until', 'note'],
   items: ['id', 'order_id', 'product_id', 'combo_id', 'name', 'qty', 'price', 'sort'],
   payments: ['id', 'order_id', 'amount', 'method', 'paid_at', 'note'],
   installs: ['id', 'order_id', 'date', 'time', 'tech_ids', 'status', 'checklist', 'note', 'issue'],

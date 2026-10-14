@@ -76,6 +76,11 @@ export const zaloHref = (p) => 'https://zalo.me/' + normPhone(p);
 
 export const subtotal = (items) => items.reduce((a, i) => a + (+i.qty || 0) * (+i.price || 0), 0);
 export const orderTotal = (items, discount) => Math.max(0, subtotal(items) - (+discount || 0));
+// Giảm theo %: làm tròn tới 1.000đ cho chẵn tiền
+export const pctDiscount = (sub, pct) => {
+  const p = Math.min(100, Math.max(0, +String(pct ?? '').replace(',', '.') || 0));
+  return Math.round((sub * p) / 100 / 1000) * 1000;
+};
 export const paidOf = (state, orderId) => state.payments.filter((p) => p.order_id === orderId).reduce((a, p) => a + (+p.amount || 0), 0);
 export const itemsOf = (state, orderId) => state.items.filter((i) => i.order_id === orderId).sort((a, b) => a.sort - b.sort);
 

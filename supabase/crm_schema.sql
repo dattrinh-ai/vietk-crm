@@ -93,7 +93,8 @@ create table if not exists public.crm_orders (
   status text not null default 'quote' check (status in ('quote', 'confirmed', 'scheduled', 'installed', 'done', 'cancelled')),
   delivery text not null default 'install' check (delivery in ('install', 'ship', 'pickup')),
   address text,
-  discount numeric not null default 0,
+  discount numeric not null default 0,          -- số tiền giảm (đã quy đổi nếu giảm theo %)
+  discount_pct numeric,                       -- có giá trị = khách được giảm theo %
   total numeric not null default 0,          -- tổng sau giảm giá (app tính khi lưu)
   quote_valid_until date,
   note text,
